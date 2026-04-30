@@ -70,6 +70,23 @@ void AGridcell::BeginPlay()
 
 		PC->SetInputMode(InputMode);
 	}
+
+	// Create and display the HUD
+	if (HUDWidgetClass)
+	{
+		HUDWidget = CreateWidget<UGameHUDWidget>(GetWorld(), HUDWidgetClass);
+
+		if (HUDWidget)
+		{
+			HUDWidget->AddToViewport();
+
+			HUDWidget->UpdateHUD(
+				TEXT("Turn: Player"),
+				TEXT("Player HP"),
+				TEXT("AI HP"),
+				TEXT("Towers 0 - 0"));  
+		}
+	}
 	//SpawnUnits();
 }
 
@@ -805,16 +822,13 @@ void AGridcell::ExecuteAITurn()
 			if (Path.Num() <= 1 || Path.Num() > AIUnit->MovementRange + 1)
 				continue;
 
-			float NewDistance = FVector::Dist(
-				Candidate->GetActorLocation(),
-				TargetTower->GetActorLocation()
-			);
+			// Evaluate candidate cell using heuristic scoring
+			float Score = EvaluateCellHeuristic(Candidate, AIUnit);
 
-			float Improvement = CurrentDistance - NewDistance;
-
-			if (Improvement > BestImprovement)
+			// Select the cell with the best heuristic score
+			if (Score > BestImprovement)
 			{
-				BestImprovement = Improvement;
+				BestImprovement = Score;
 				BestMoveCell = Candidate;
 			}
 		}
@@ -1634,4 +1648,80 @@ void AGridcell::ResetTurn()
 	bIsUnitMoving = false;
 
 	UE_LOG(LogTemp, Warning, TEXT("TURN RESET COMPLETE"));
+}
+
+
+float AGridcell::EvaluateCellHeuristic(AMyActor* Cell, AUnit* AIUnit)
+{
+	if (!Cell || !AIUnit) return -9999.f;
+
+	float Score = 0.f;
+
+	// 
+	// 1. Reward cells near neutral or enemy towers
+	// 
+	for (ATower* Tower : Towers)
+	{
+		if (!Tower) continue;
+
+		int32 dx = FMath::Abs(Cell->X - Tower->GridX);
+		int32 dy = FMath::Abs(Cell->Y - Tower->GridY);
+
+		// If cell is near tower, assign priority
+		if (dx <= 2 && dy <= 2)
+		{
+			if (Tower->TowerState == ETowerState::Neutral)
+			{
+				Score += 100.f;
+			}
+			else if (Tower->ControllingTeam == ETeam::Player)
+			{
+				Score += 80.f;
+			}
+		}
+	}
+
+	// 2. Reward cells from which AI can attack player
+	// 
+	for (AMyActor* OtherCell : GridCells)
+	{
+		if (!OtherCell || !OtherCell->OccupyingUnit) continue;
+
+		if (OtherCell->OccupyingUnit->Team == ETeam::Player)
+		{
+			int32 dx = FMath::Abs(Cell->X - OtherCell->X);
+			int32 dy = FMath::Abs(Cell->Y - OtherCell->Y);
+
+			// Attack range bonus
+			if (dx + dy <= AIUnit->AttackRange)
+			{
+				Score += 50.f;
+			}
+
+			// Distance penalty to enemy
+			Score -= (dx + dy);
+		}
+	}
+
+	
+	// 3. Penalize dangerous cells near enemies
+	
+	for (AMyActor* OtherCell : GridCells)
+	{
+		if (!OtherCell || !OtherCell->OccupyingUnit) continue;
+
+		if (OtherCell->OccupyingUnit->Team == ETeam::Player)
+		{
+			int32 dx = FMath::Abs(Cell->X - OtherCell->X);
+			int32 dy = FMath::Abs(Cell->Y - OtherCell->Y);
+
+			// If too close to enemy, risk penalty
+			if (dx + dy <= 1)
+			{
+				Score -= 30.f;
+			}
+		}
+	}
+
+	return Score;
 }

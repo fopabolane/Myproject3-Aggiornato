@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "MyActor.h"
 #include "Unit.h"
+#include "GameHUDWidget.h"
 
 #include "Gridcell.generated.h" // Questo include DEVE essere l'ULTIMO prima delle dichiarazioni UCLASS/USTRUCT/UENUM
 
@@ -209,4 +210,13 @@ public:
    AMyActor* PlayerSniperSpawnCell;
    AMyActor* AIBrawlerSpawnCell;
    AMyActor* AISniperSpawnCell;
+
+   UPROPERTY(EditAnywhere, Category = "UI")
+   TSubclassOf<UGameHUDWidget> HUDWidgetClass; // Reference to the HUD widget class
+
+   UPROPERTY()
+   UGameHUDWidget* HUDWidget; // Reference to the HUD widget instance
+
+   // Evaluate the heuristic value of a reachable cell for the AI
+   float EvaluateCellHeuristic(AMyActor* Cell, AUnit* AIUnit);
 };
