@@ -28,4 +28,5 @@ nel range. OK
 9: Lista dello storico delle mosse eseguite. OK
 
 10:  AI che utilizza algoritmi euristici ottimizzati di movimento (diverso 
-da A*). Parzialmente.
+da A*). OK
+
